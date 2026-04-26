@@ -60,6 +60,10 @@ add_executable(${PROJECT_NAME}
     ${UTILS_SOURCES}
 )
 
+# 查找UUID库
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(UUID REQUIRED uuid)
+
 # 链接库
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Boost::system
@@ -70,7 +74,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Threads::Threads
     OpenSSL::SSL
     OpenSSL::Crypto
+    ${UUID_LIBRARIES}
+    z
 )
+
+# 添加包含目录
+target_include_directories(${PROJECT_NAME} PRIVATE ${UUID_INCLUDE_DIRS})
 
 # 添加预处理器定义
 target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -137,7 +146,32 @@ if(BUILD_TESTS)
     )
     add_test(NAME test_storage COMMAND test_storage)
     
-    message(STATUS "Tests enabled: test_logger, test_config, test_storage")
+    # Network测试（网络层）
+    add_executable(test_network 
+        tests/unit/test_network.cpp
+        src/network/MessageProtocol.cpp
+        src/network/WebSocketServer.cpp
+        src/utils/Logger.cpp
+    )
+    target_link_libraries(test_network PRIVATE
+        Boost::system
+        Boost::thread
+        nlohmann_json::nlohmann_json
+        Crow::Crow
+        Threads::Threads
+        ${UUID_LIBRARIES}
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        z
+    )
+    target_include_directories(test_network PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests/unit
+        ${UUID_INCLUDE_DIRS}
+    )
+    add_test(NAME test_network COMMAND test_network)
+    
+    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network")
 endif()
 
 # 安装规则
