@@ -9,6 +9,8 @@
 #include "storage/Database.h"
 #include "storage/DocumentDAO.h"
 #include "storage/OperationDAO.h"
+#include "network/WebSocketServer.h"
+#include "network/MessageProtocol.h"
 
 // 包含第三方库
 #include <nlohmann/json.hpp>
@@ -19,6 +21,7 @@
 using json = nlohmann::json;
 using namespace utils;
 using namespace storage;
+using namespace network;
 
 int main() {
     std::cout << "========================================" << std::endl;
@@ -187,16 +190,44 @@ int main() {
     
     std::cout << "========================================" << std::endl;
     
-    // 关闭数据库
+    // ============================================
+    // 启动WebSocket服务器
+    // ============================================
+    std::cout << std::endl;
+    LOG_INFO("Initializing WebSocket Server...");
+    
+    // 从配置文件读取服务器配置
+    // 注意：前面已经加载过配置，这里确保获取最新或重新加载以防万一
+    // 如果配置已在前面成功加载，可以直接使用 config.getInstance() 获取值
+    
+    std::string wsHost = config.get<std::string>("server.websocket_host", "0.0.0.0");
+    int wsPort = config.get<int>("server.websocket_port", 8080);
+    
+    LOG_INFO("WebSocket Server will listen on " + wsHost + ":" + std::to_string(wsPort));
+    
+    // 创建WebSocket服务器实例
+    WebSocketServer wsServer(wsHost, wsPort);
+    
+    // 设置消息处理回调
+    wsServer.setMessageHandler([](const std::string& connId, const Message& msg) {
+        LOG_DEBUG("Received message from " + connId + ": type=" + 
+                 std::to_string(static_cast<int>(msg.type)));
+    });
+    
+    std::cout << "========================================" << std::endl;
+    std::cout << "  WebSocket Server Starting..." << std::endl;
+    std::cout << "  URL: ws://" << wsHost << ":" << wsPort << "/ws" << std::endl;
+    std::cout << "  Health Check: http://" << wsHost << ":" << wsPort << "/health" << std::endl;
+    std::cout << "========================================" << std::endl;
+    
+    // 启动服务器（阻塞）
+    wsServer.start();
+    
+    // 关闭数据库 (正常退出时执行，如果start是阻塞的，则会在服务器停止后执行)
     database.shutdown();
     
     // 关闭日志系统
     logger.shutdown();
-    
-    // 清理测试数据库
-    std::remove("test_collab_engine.db");
-    std::remove("test_collab_engine.db-wal");
-    std::remove("test_collab_engine.db-shm");
     
     return 0;
 }
