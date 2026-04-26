@@ -1,0 +1,24 @@
+{
+    "server": {
+        "host": "0.0.0.0",
+        "port": 8080,
+        "max_connections": 1000,
+        "heartbeat_interval": 30
+    },
+    "database": {
+        "path": "collab_engine.db",
+        "pool_size": 5
+    },
+    "room": {
+        "max_users_per_room": 50,
+        "default_room_capacity": 10
+    },
+    "session": {
+        "timeout_minutes": 30,
+        "token_secret": "your-secret-key-here"
+    },
+    "logging": {
+        "level": "INFO",
+        "file_path": "logs/server.log"
+    }
+}
