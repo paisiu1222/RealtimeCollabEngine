@@ -1,0 +1,41 @@
+{
+    "server": {
+        "host": "0.0.0.0",
+        "port": 8080,
+        "websocket_host": "0.0.0.0",
+        "websocket_port": 8080,
+        "max_connections": 1000,
+        "ssl_enabled": false,
+        "ssl_cert_path": "",
+        "ssl_key_path": ""
+    },
+    "database": {
+        "path": "/opt/collab-engine/data/collab_engine.db",
+        "pool_size": 5,
+        "journal_mode": "WAL",
+        "synchronous": "NORMAL"
+    },
+    "logging": {
+        "level": "INFO",
+        "log_dir": "/opt/collab-engine/logs",
+        "log_file": "server.log",
+        "max_file_size_mb": 10,
+        "max_backup_count": 5,
+        "console_output": false
+    },
+    "snapshot": {
+        "enabled": true,
+        "interval_operations": 100,
+        "max_snapshots_per_doc": 5
+    },
+    "cleanup": {
+        "enabled": true,
+        "operations_retention_days": 30,
+        "check_interval_hours": 24
+    },
+    "performance": {
+        "enable_metrics": true,
+        "metrics_export_interval_seconds": 60,
+        "connection_pool_timeout_ms": 5000
+    }
+}

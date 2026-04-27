@@ -1,0 +1,34 @@
+[Unit]
+Description=Realtime Collaborative Engine
+Documentation=https://github.com/paisiu1222/RealtimeCollabEngine
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=collab
+Group=collab
+WorkingDirectory=/opt/collab-engine
+ExecStart=/opt/collab-engine/build/bin/RealtimeCollabEngine --config /opt/collab-engine/config.json
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=collab-engine
+
+# 安全设置
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/collab-engine/logs /opt/collab-engine/data
+
+# 资源限制
+LimitNOFILE=65536
+MemoryMax=1G
+CPUQuota=80%
+
+# 环境变量
+Environment=TZ=Asia/Shanghai
+
+[Install]
+WantedBy=multi-user.target
