@@ -3,12 +3,16 @@
 
 #include "core/Operation.h"
 #include <string>
+#include <functional>
+#include <map>
 
 namespace core {
 
 /**
  * OT算法类
  * 实现Operational Transformation算法，用于解决并发编辑冲突
+ * 
+ * 采用策略模式替代大量switch-case，提高代码可维护性和扩展性
  */
 class OTAlgorithm {
 public:
@@ -17,75 +21,60 @@ public:
      * @param localOp 本地操作（将要应用的）
      * @param remoteOp 远程操作（已经应用的）
      * @return 转换后的本地操作
-     * 
-     * 转换原则：
-     * - 如果remoteOp在localOp之前插入/删除，需要调整localOp的位置
-     * - 保证两个操作应用后的最终状态一致
      */
     static Operation transform(const Operation& localOp, const Operation& remoteOp);
     
     /**
      * 检查两个操作是否冲突
-     * @param op1 操作1
-     * @param op2 操作2
-     * @return 是否冲突
      */
     static bool isConflict(const Operation& op1, const Operation& op2);
     
     /**
      * 合并多个操作为一个复合操作（优化用）
-     * @param operations 操作列表
-     * @return 合并后的操作（如果无法合并则返回空）
      */
     static Operation mergeOperations(const std::vector<Operation>& operations);
 
 private:
-    // ==================== 内部转换方法 ====================
+    // ==================== 转换函数类型定义 ====================
+    using TransformFunc = std::function<Operation(const Operation&, const Operation&)>;
     
     /**
-     * INSERT vs INSERT 转换
+     * 初始化转换函数表
+     * 使用静态局部变量确保只初始化一次
      */
+    static const std::map<std::pair<OperationType, OperationType>, TransformFunc>& getTransformTable();
+    
+    // ==================== 具体转换策略 ====================
+    
+    /** INSERT vs INSERT */
     static Operation transformInsertInsert(const Operation& local, const Operation& remote);
     
-    /**
-     * INSERT vs DELETE 转换
-     */
+    /** INSERT vs DELETE */
     static Operation transformInsertDelete(const Operation& local, const Operation& remote);
     
-    /**
-     * DELETE vs INSERT 转换
-     */
+    /** DELETE vs INSERT */
     static Operation transformDeleteInsert(const Operation& local, const Operation& remote);
     
-    /**
-     * DELETE vs DELETE 转换
-     */
+    /** DELETE vs DELETE */
     static Operation transformDeleteDelete(const Operation& local, const Operation& remote);
     
-    /**
-     * INSERT vs REPLACE 转换
-     */
+    /** INSERT vs REPLACE */
     static Operation transformInsertReplace(const Operation& local, const Operation& remote);
     
-    /**
-     * DELETE vs REPLACE 转换
-     */
+    /** DELETE vs REPLACE */
     static Operation transformDeleteReplace(const Operation& local, const Operation& remote);
     
-    /**
-     * REPLACE vs INSERT 转换
-     */
+    /** REPLACE vs INSERT */
     static Operation transformReplaceInsert(const Operation& local, const Operation& remote);
     
-    /**
-     * REPLACE vs DELETE 转换
-     */
+    /** REPLACE vs DELETE */
     static Operation transformReplaceDelete(const Operation& local, const Operation& remote);
     
-    /**
-     * REPLACE vs REPLACE 转换
-     */
+    /** REPLACE vs REPLACE */
     static Operation transformReplaceReplace(const Operation& local, const Operation& remote);
+    
+    /** 默认转换（无需转换的情况） */
+    static Operation defaultTransform(const Operation& local, const Operation& /*remote*/);
 };
 
 } // namespace core

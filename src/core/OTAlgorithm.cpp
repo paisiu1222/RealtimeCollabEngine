@@ -1,5 +1,6 @@
 #include "core/OTAlgorithm.h"
 #include <algorithm>
+#include <map>
 
 namespace core {
 
@@ -11,47 +12,17 @@ Operation OTAlgorithm::transform(const Operation& localOp, const Operation& remo
         return localOp;
     }
     
-    // 根据操作类型分发到不同的转换函数
-    switch (localOp.type) {
-        case OperationType::INSERT:
-            switch (remoteOp.type) {
-                case OperationType::INSERT:
-                    return transformInsertInsert(localOp, remoteOp);
-                case OperationType::DELETE:
-                    return transformInsertDelete(localOp, remoteOp);
-                case OperationType::REPLACE:
-                    return transformInsertReplace(localOp, remoteOp);
-                default:
-                    return localOp;
-            }
-            
-        case OperationType::DELETE:
-            switch (remoteOp.type) {
-                case OperationType::INSERT:
-                    return transformDeleteInsert(localOp, remoteOp);
-                case OperationType::DELETE:
-                    return transformDeleteDelete(localOp, remoteOp);
-                case OperationType::REPLACE:
-                    return transformDeleteReplace(localOp, remoteOp);
-                default:
-                    return localOp;
-            }
-            
-        case OperationType::REPLACE:
-            switch (remoteOp.type) {
-                case OperationType::INSERT:
-                    return transformReplaceInsert(localOp, remoteOp);
-                case OperationType::DELETE:
-                    return transformReplaceDelete(localOp, remoteOp);
-                case OperationType::REPLACE:
-                    return transformReplaceReplace(localOp, remoteOp);
-                default:
-                    return localOp;
-            }
-            
-        default:
-            return localOp;
+    // 使用函数表查找对应的转换策略
+    auto key = std::make_pair(localOp.type, remoteOp.type);
+    const auto& table = getTransformTable();
+    
+    auto it = table.find(key);
+    if (it != table.end()) {
+        return it->second(localOp, remoteOp);
     }
+    
+    // 默认返回原操作（无需转换）
+    return defaultTransform(localOp, remoteOp);
 }
 
 bool OTAlgorithm::isConflict(const Operation& op1, const Operation& op2) {
@@ -79,18 +50,14 @@ Operation OTAlgorithm::mergeOperations(const std::vector<Operation>& operations)
     }
     
     // 简化实现：只合并在同一位置的连续INSERT操作
-    // 实际生产环境需要更复杂的合并逻辑
-    
     Operation merged = operations[0];
     for (size_t i = 1; i < operations.size(); ++i) {
         const auto& op = operations[i];
         
-        // 只能合并相同类型的操作
         if (op.type != merged.type) {
             return Operation(); // 无法合并
         }
         
-        // 对于INSERT操作，如果在相同位置，可以合并内容
         if (op.type == OperationType::INSERT && op.position == merged.position) {
             merged.content += op.content;
         } else {
@@ -101,7 +68,31 @@ Operation OTAlgorithm::mergeOperations(const std::vector<Operation>& operations)
     return merged;
 }
 
-// ==================== 内部转换方法 ====================
+// ==================== 转换函数表初始化 ====================
+
+const std::map<std::pair<OperationType, OperationType>, OTAlgorithm::TransformFunc>& 
+OTAlgorithm::getTransformTable() {
+    static const std::map<std::pair<OperationType, OperationType>, TransformFunc> table = {
+        // INSERT vs *
+        {{OperationType::INSERT, OperationType::INSERT}, transformInsertInsert},
+        {{OperationType::INSERT, OperationType::DELETE}, transformInsertDelete},
+        {{OperationType::INSERT, OperationType::REPLACE}, transformInsertReplace},
+        
+        // DELETE vs *
+        {{OperationType::DELETE, OperationType::INSERT}, transformDeleteInsert},
+        {{OperationType::DELETE, OperationType::DELETE}, transformDeleteDelete},
+        {{OperationType::DELETE, OperationType::REPLACE}, transformDeleteReplace},
+        
+        // REPLACE vs *
+        {{OperationType::REPLACE, OperationType::INSERT}, transformReplaceInsert},
+        {{OperationType::REPLACE, OperationType::DELETE}, transformReplaceDelete},
+        {{OperationType::REPLACE, OperationType::REPLACE}, transformReplaceReplace},
+    };
+    
+    return table;
+}
+
+// ==================== 具体转换策略实现 ====================
 
 Operation OTAlgorithm::transformInsertInsert(const Operation& local, const Operation& remote) {
     Operation result = local;
@@ -152,15 +143,12 @@ Operation OTAlgorithm::transformDeleteInsert(const Operation& local, const Opera
     }
     
     // 如果本地删除与远程插入重叠，需要分割删除操作
-    // 简化处理：保持原位置，但可能需要调整删除长度
     size_t overlapStart = std::max(local.position, remote.position);
     size_t overlapEnd = std::min(local.position + local.content.length(), 
                                  remote.position + remote.content.length());
     
     if (overlapEnd > overlapStart) {
-        // 有重叠，调整删除长度
         result.content = local.content.substr(0, overlapStart - local.position);
-        // 注意：这里简化处理，实际应该保留被删除的内容信息
     }
     
     return result;
@@ -280,6 +268,10 @@ Operation OTAlgorithm::transformReplaceReplace(const Operation& local, const Ope
     // 如果完全重叠，保持原位（后面的操作会覆盖前面的）
     // 如果部分重叠，简化处理：保持原位
     return result;
+}
+
+Operation OTAlgorithm::defaultTransform(const Operation& local, const Operation& /*remote*/) {
+    return local;
 }
 
 } // namespace core
