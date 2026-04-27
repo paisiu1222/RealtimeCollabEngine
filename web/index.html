@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时协作编辑器 - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 1200px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+            transition: background 0.3s;
+        }
+        
+        .status-dot.connected {
+            background: #00C851;
+        }
+        
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .editor-container {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        textarea {
+            flex: 1;
+            width: 100%;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            border-color: #667eea;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-left: 2px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .sidebar h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .user-list {
+            list-style: none;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .info-label {
+            color: #666;
+        }
+        
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 实时协作编辑器</h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">未连接</span>
+            </div>
+        </div>
+        
+        <div class="main">
+            <div class="editor-container">
+                <div class="toolbar">
+                    <button class="btn" id="connectBtn" onclick="connect()">连接服务器</button>
+                    <button class="btn" id="sendBtn" onclick="sendTestOperation()" disabled>发送测试操作</button>
+                    <button class="btn" onclick="clearEditor()">清空编辑器</button>
+                </div>
+                
+                <textarea 
+                    id="editor" 
+                    placeholder="在这里开始编辑...&#10;&#10;提示：&#10;1. 点击'连接服务器'建立WebSocket连接&#10;2. 在编辑器中输入文本&#10;3. 其他用户的修改会实时显示在这里"
+                ></textarea>
+            </div>
+            
+            <div class="sidebar">
+                <h3>👥 在线用户</h3>
+                <ul class="user-list" id="userList">
+                    <li class="user-item">
+                        <div class="user-avatar">我</div>
+                        <span>当前用户</span>
+                    </li>
+                </ul>
+                
+                <div class="info-panel">
+                    <h3 style="margin-bottom: 15px;">📊 连接信息</h3>
+                    <div class="info-item">
+                        <span class="info-label">服务器:</span>
+                        <span class="info-value" id="serverInfo">ws://localhost:8080</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文档ID:</span>
+                        <span class="info-value" id="docId">doc_demo_001</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">操作数:</span>
+                        <span class="info-value" id="opCount">0</span>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px;">📋 活动日志</h3>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry">系统就绪...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="websocket-client.js"></script>
+</body>
+</html>
