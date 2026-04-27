@@ -138,6 +138,16 @@ private:
         throw std::runtime_error("Assertion failed: string is empty"); \
     }
 
+#define ASSERT_GE(a, b) \
+    if ((a) < (b)) { \
+        throw std::runtime_error("Assertion failed: " #a " < " #b); \
+    }
+
+#define ASSERT_LE(a, b) \
+    if ((a) > (b)) { \
+        throw std::runtime_error("Assertion failed: " #a " > " #b); \
+    }
+
 // 注册测试宏
 #define TEST(suite_name, test_name) \
     void suite_name##_##test_name(); \

@@ -193,7 +193,31 @@ if(BUILD_TESTS)
     )
     add_test(NAME test_ot_algorithm COMMAND test_ot_algorithm)
     
-    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm")
+    # Sync & Broadcast测试（同步与广播）
+    add_executable(test_sync_broadcast 
+        tests/unit/test_sync_broadcast.cpp
+        src/network/Room.cpp
+        src/network/SessionManager.cpp
+        src/network/MessageProtocol.cpp
+        src/core/Operation.cpp
+        src/core/DocumentState.cpp
+        src/utils/Logger.cpp
+    )
+    target_link_libraries(test_sync_broadcast PRIVATE
+        Boost::system
+        Boost::thread
+        nlohmann_json::nlohmann_json
+        Threads::Threads
+        ${UUID_LIBRARIES}
+    )
+    target_include_directories(test_sync_broadcast PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests/unit
+        ${UUID_INCLUDE_DIRS}
+    )
+    add_test(NAME test_sync_broadcast COMMAND test_sync_broadcast)
+    
+    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm, test_sync_broadcast")
 endif()
 
 # 安装规则
