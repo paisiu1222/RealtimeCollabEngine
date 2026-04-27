@@ -171,7 +171,29 @@ if(BUILD_TESTS)
     )
     add_test(NAME test_network COMMAND test_network)
     
-    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network")
+    # Core测试（OT算法核心）
+    add_executable(test_ot_algorithm 
+        tests/unit/test_ot_algorithm.cpp
+        src/core/Operation.cpp
+        src/core/DocumentState.cpp
+        src/core/OTAlgorithm.cpp
+        src/utils/Logger.cpp
+    )
+    target_link_libraries(test_ot_algorithm PRIVATE
+        Boost::system
+        Boost::thread
+        nlohmann_json::nlohmann_json
+        Threads::Threads
+        ${UUID_LIBRARIES}
+    )
+    target_include_directories(test_ot_algorithm PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests/unit
+        ${UUID_INCLUDE_DIRS}
+    )
+    add_test(NAME test_ot_algorithm COMMAND test_ot_algorithm)
+    
+    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm")
 endif()
 
 # 安装规则
