@@ -22,11 +22,14 @@ bool SnapshotManager::createSnapshot(const std::string& docId, const DocumentSta
     try {
         auto& db = storage::Database::getInstance();
         
+        // 获取当前版本号
+        uint64_t version = state.getVersion();
+        
         // 插入快照记录
         std::string sql = "INSERT INTO snapshots (doc_id, version, content, created_at) VALUES (?, ?, ?, datetime('now'))";
         std::vector<std::string> params = {
             docId,
-            std::to_string(state.getVersion()),
+            std::to_string(version),
             state.getContent()
         };
         
@@ -34,7 +37,7 @@ bool SnapshotManager::createSnapshot(const std::string& docId, const DocumentSta
         
         if (result) {
             logger.info("Snapshot created for document: " + docId + 
-                       ", version: " + std::to_string(state.getVersion()));
+                       ", version: " + std::to_string(version));
         } else {
             logger.error("Failed to create snapshot for document: " + docId);
         }

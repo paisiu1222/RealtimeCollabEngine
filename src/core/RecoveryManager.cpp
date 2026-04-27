@@ -23,12 +23,30 @@ std::shared_ptr<DocumentState> RecoveryManager::recoverDocument(const std::strin
     // 1. 从快照重建基础状态
     auto state = rebuildFromSnapshot(docId);
     
-    logger.info("Loaded snapshot, starting recovery from operations");
+    if (state->getVersion() == 0) {
+        logger.info("No snapshot found, returning empty state");
+        return state;
+    }
+    
+    uint64_t snapshotVersion = state->getVersion();
+    logger.info("Loaded snapshot at version " + std::to_string(snapshotVersion));
     
     // 2. 获取快照后的所有操作并应用
-    // TODO: 实际应该查询数据库中的operations表并应用
+    auto operations = getOperationsAfterVersion(docId, snapshotVersion);
     
-    logger.info("Document recovery completed for: " + docId);
+    logger.info("Applying " + std::to_string(operations.size()) + " operations after snapshot");
+    
+    for (const auto& op : operations) {
+        auto result = state->applyOperation(op);
+        if (result != OperationResult::SUCCESS) {
+            logger.warning("Failed to apply operation " + op.opId + 
+                          " during recovery, result: " + std::to_string(static_cast<int>(result)));
+            // 继续处理其他操作，不中断恢复过程
+        }
+    }
+    
+    logger.info("Document recovery completed for: " + docId + 
+               ", final version: " + std::to_string(state->getVersion()));
     
     return state;
 }
@@ -44,22 +62,41 @@ std::shared_ptr<DocumentState> RecoveryManager::recoverToVersion(const std::stri
     uint64_t latestSnapshotVersion = snapshotManager.getLatestSnapshotVersion(docId);
     
     std::shared_ptr<DocumentState> state;
+    uint64_t startVersion = 0;
     
     if (latestSnapshotVersion > 0 && latestSnapshotVersion <= targetVersion) {
         // 使用快照作为起点
         state = rebuildFromSnapshot(docId);
-        logger.info("Using snapshot at version " + std::to_string(latestSnapshotVersion));
+        startVersion = latestSnapshotVersion;
+        logger.info("Using snapshot at version " + std::to_string(startVersion));
     } else {
         // 没有合适的快照，从头开始
         state = std::make_shared<DocumentState>(docId);
+        startVersion = 0;
         logger.info("No suitable snapshot found, starting from empty state");
     }
     
-    // 2. 获取从快照到目标版本的操作（简化实现）
-    // TODO: 实际应该查询operations表并应用操作
+    // 2. 获取从快照到目标版本的操作并应用
+    auto operations = getOperationsAfterVersion(docId, startVersion, targetVersion);
+    
+    logger.info("Applying " + std::to_string(operations.size()) + " operations to reach version " + 
+               std::to_string(targetVersion));
+    
+    for (const auto& op : operations) {
+        if (op.version > targetVersion) {
+            break; // 已达到目标版本
+        }
+        
+        auto result = state->applyOperation(op);
+        if (result != OperationResult::SUCCESS) {
+            logger.warning("Failed to apply operation " + op.opId + 
+                          " during versioned recovery, result: " + std::to_string(static_cast<int>(result)));
+        }
+    }
     
     logger.info("Document recovery to version " + std::to_string(targetVersion) + 
-               " completed for: " + docId);
+               " completed for: " + docId + 
+               ", actual version: " + std::to_string(state->getVersion()));
     
     return state;
 }
@@ -78,6 +115,8 @@ std::shared_ptr<DocumentState> RecoveryManager::rebuildFromSnapshot(const std::s
                    ", starting from empty state");
     } else {
         logger.info("Rebuilt state from snapshot version: " + std::to_string(snapshotData.version));
+        // 注意：DocumentState的版本号通过applyOperation自动管理
+        // 这里无法直接设置版本号，需要通过后续操作来同步
     }
     
     return state;
