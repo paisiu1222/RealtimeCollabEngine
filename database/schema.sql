@@ -90,7 +90,22 @@ CREATE INDEX IF NOT EXISTS idx_operations_op_id ON operations(op_id);
 CREATE INDEX IF NOT EXISTS idx_operations_timestamp ON operations(timestamp DESC);
 
 -- ============================================
--- 6. 房间表 (rooms) - 用于实时协作会话
+-- 6. 快照表 (snapshots) - 用于文档状态恢复
+-- ============================================
+CREATE TABLE IF NOT EXISTS snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_doc_version ON snapshots(doc_id, version);
+CREATE INDEX IF NOT EXISTS idx_snapshots_created ON snapshots(created_at DESC);
+
+-- ============================================
+-- 7. 房间表 (rooms) - 用于实时协作会话
 -- ============================================
 CREATE TABLE IF NOT EXISTS rooms (
     room_id TEXT PRIMARY KEY,
@@ -104,7 +119,7 @@ CREATE TABLE IF NOT EXISTS rooms (
 CREATE INDEX IF NOT EXISTS idx_rooms_doc ON rooms(doc_id);
 
 -- ============================================
--- 7. 房间成员表 (room_members)
+-- 8. 房间成员表 (room_members)
 -- ============================================
 CREATE TABLE IF NOT EXISTS room_members (
     room_id TEXT NOT NULL,
@@ -120,7 +135,7 @@ CREATE TABLE IF NOT EXISTS room_members (
 CREATE INDEX IF NOT EXISTS idx_room_members_user ON room_members(user_id);
 
 -- ============================================
--- 8. 系统配置表 (system_config)
+-- 9. 系统配置表 (system_config)
 -- ============================================
 CREATE TABLE IF NOT EXISTS system_config (
     key TEXT PRIMARY KEY,

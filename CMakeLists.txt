@@ -242,7 +242,32 @@ if(BUILD_TESTS)
     )
     add_test(NAME test_advanced_features COMMAND test_advanced_features)
     
-    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm, test_sync_broadcast, test_advanced_features")
+    # Persistence & Recovery测试（持久化与恢复）
+    add_executable(test_persistence_recovery 
+        tests/unit/test_persistence_recovery.cpp
+        src/core/SnapshotManager.cpp
+        src/core/RecoveryManager.cpp
+        src/core/Operation.cpp
+        src/core/DocumentState.cpp
+        src/storage/Database.cpp
+        src/utils/Logger.cpp
+    )
+    target_link_libraries(test_persistence_recovery PRIVATE
+        Boost::system
+        Boost::thread
+        nlohmann_json::nlohmann_json
+        Threads::Threads
+        ${UUID_LIBRARIES}
+        sqlite3
+    )
+    target_include_directories(test_persistence_recovery PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests/unit
+        ${UUID_INCLUDE_DIRS}
+    )
+    add_test(NAME test_persistence_recovery COMMAND test_persistence_recovery)
+    
+    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm, test_sync_broadcast, test_advanced_features, test_persistence_recovery")
 endif()
 
 # 安装规则
