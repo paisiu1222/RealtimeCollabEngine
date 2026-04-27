@@ -217,7 +217,32 @@ if(BUILD_TESTS)
     )
     add_test(NAME test_sync_broadcast COMMAND test_sync_broadcast)
     
-    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm, test_sync_broadcast")
+    # Advanced Features测试（冲突解决与离线支持）
+    add_executable(test_advanced_features 
+        tests/unit/test_advanced_features.cpp
+        src/core/ConflictResolver.cpp
+        src/core/OfflineQueue.cpp
+        src/core/SyncManager.cpp
+        src/core/Operation.cpp
+        src/core/DocumentState.cpp
+        src/core/OTAlgorithm.cpp
+        src/utils/Logger.cpp
+    )
+    target_link_libraries(test_advanced_features PRIVATE
+        Boost::system
+        Boost::thread
+        nlohmann_json::nlohmann_json
+        Threads::Threads
+        ${UUID_LIBRARIES}
+    )
+    target_include_directories(test_advanced_features PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests/unit
+        ${UUID_INCLUDE_DIRS}
+    )
+    add_test(NAME test_advanced_features COMMAND test_advanced_features)
+    
+    message(STATUS "Tests enabled: test_logger, test_config, test_storage, test_network, test_ot_algorithm, test_sync_broadcast, test_advanced_features")
 endif()
 
 # 安装规则
