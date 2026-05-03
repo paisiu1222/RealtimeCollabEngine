@@ -70,13 +70,11 @@ public:
      * 应用操作并广播给其他用户
      * @param op 要应用的操作
      * @param senderId 发送者用户ID
-     * @param broadcastCallback 广播回调函数
      * @return 操作结果
      */
     core::OperationResult applyAndBroadcast(
-        const core::Operation& op, 
-        const std::string& senderId,
-        const BroadcastCallback& broadcastCallback
+        const core::Operation& op,
+        const std::string& senderId
     );
     
     /**

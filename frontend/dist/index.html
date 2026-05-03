@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealtimeCollabEngine — 实时协作文档</title>
+  <script type="module" crossorigin src="/assets/index-B0i2L3ge.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-B_FzS31-.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ====== 左侧：文档列表面板 ====== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>&#9998; 协作引擎</h2>
+        <button class="btn btn-primary btn-sm" id="newDocBtn" title="新建文档">+ 新建</button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" placeholder="搜索文档..." id="searchInput" />
+      </div>
+      <div class="doc-list" id="docList">
+        <!-- 动态渲染 -->
+      </div>
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">未连接</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====== 右侧：主编辑区域 ====== -->
+    <main class="main-area" id="mainArea">
+
+      <!-- 空状态：未打开文档 -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">&#x1f4c4;</div>
+        <h2>欢迎使用实时协作引擎</h2>
+        <p>从左侧选择一个文档开始编辑，或创建一个新文档</p>
+        <button class="btn btn-primary" onclick="document.getElementById('newDocBtn').click()">+ 创建新文档</button>
+      </div>
+
+      <!-- 编辑状态：文档已打开 -->
+      <div class="editor-workspace" id="editorWorkspace" style="display:none">
+
+        <!-- 文档页 -->
+        <div class="doc-page" id="docPage">
+          <div class="doc-title-wrap">
+            <input class="doc-title" id="docTitle" placeholder="无标题文档" value="无标题文档" />
+            <span class="save-indicator" id="saveIndicator">已保存</span>
+          </div>
+          <div class="doc-meta">
+            <span id="docMetaOwner"></span>
+            <span class="meta-sep">·</span>
+            <span id="docMetaTime"></span>
+            <span class="meta-sep">·</span>
+            <span id="docMetaVersion"></span>
+          </div>
+
+          <div class="editor-container" id="editorContainer">
+            <div class="editor-body" contenteditable="true" id="editor" spellcheck="false"></div>
+            <!-- 远程光标浮层 -->
+            <div class="remote-cursors-layer" id="cursorsLayer"></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ====== 右侧：协作者 + 版本历史面板 ====== -->
+    <aside class="collab-panel" id="collabPanel" style="display:none">
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab="collab" onclick="window._switchTab('collab')">&#x1f465; 协作者</button>
+        <button class="panel-tab" data-tab="versions" onclick="window._switchTab('versions')">&#x1f4dc; 版本历史</button>
+      </div>
+
+      <!-- Tab 1: 协作者 -->
+      <div class="panel-tab-content" id="tab-collab" style="display:flex;flex-direction:column;flex:1;overflow-y:auto;">
+        <div class="panel-section">
+          <ul class="collab-list" id="collabList">
+            <li class="collab-item" id="localUserItem">
+              <div class="collab-avatar" id="localAvatar"></div>
+              <div class="collab-info">
+                <span class="collab-name" id="localName"></span>
+                <span class="collab-role">我</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="panel-section">
+          <h3>&#x1f4ca; 文档信息</h3>
+          <div class="info-grid">
+            <div class="info-item"><span class="info-label">版本</span><span class="info-value" id="infoVersion">0</span></div>
+            <div class="info-item"><span class="info-label">操作数</span><span class="info-value" id="infoOps">0</span></div>
+            <div class="info-item"><span class="info-label">字数</span><span class="info-value" id="infoChars">0</span></div>
+            <div class="info-item"><span class="info-label">在线</span><span class="info-value" id="infoOnline">1</span></div>
+          </div>
+        </div>
+        <div class="panel-section flex-fill">
+          <h3>&#x1f4cb; 活动日志</h3>
+          <div class="log-container" id="logContainer">
+            <div class="log-entry">系统就绪</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: 版本历史 -->
+      <div class="panel-tab-content" id="tab-versions" style="display:none;flex-direction:column;flex:1;overflow-y:auto;">
+        <div class="panel-section" style="border-bottom:1px solid var(--border)">
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="window._createSnapshot()">&#x1f4be; 保存当前版本</button>
+        </div>
+        <div class="panel-section flex-fill" style="padding-top:4px">
+          <div class="version-list" id="versionList">
+            <div class="version-empty">打开文档后查看版本历史</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

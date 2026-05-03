@@ -74,20 +74,12 @@ ConflictResolver::ConflictType ConflictResolver::checkPositionConflict(
         return ConflictType::NONE;
     }
     
-    // 计算操作影响的范围
+    // 计算操作影响的范围（与OTAlgorithm::isConflict保持一致）
     size_t op1Start = op1.position;
-    size_t op1End = op1.position + (op1.type == OperationType::DELETE ? op1.content.length() : 0);
-    
+    size_t op1End = op1.position + op1.content.length();
+
     size_t op2Start = op2.position;
-    size_t op2End = op2.position + (op2.type == OperationType::DELETE ? op2.content.length() : 0);
-    
-    // 对于INSERT操作，影响范围就是插入位置
-    if (op1.type == OperationType::INSERT) {
-        op1End = op1Start + 1;
-    }
-    if (op2.type == OperationType::INSERT) {
-        op2End = op2Start + 1;
-    }
+    size_t op2End = op2.position + op2.content.length();
     
     // 检查是否有重叠
     if (op1Start < op2End && op2Start < op1End) {

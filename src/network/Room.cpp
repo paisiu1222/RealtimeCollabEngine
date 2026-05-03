@@ -74,9 +74,8 @@ std::string Room::getUserConnection(const std::string& userId) const {
 // ==================== 操作应用与广播 ====================
 
 core::OperationResult Room::applyAndBroadcast(
-    const core::Operation& op, 
-    const std::string& senderId,
-    const BroadcastCallback& /*broadcastCallback*/
+    const core::Operation& op,
+    const std::string& senderId
 ) {
     // 应用操作到文档
     auto result = document.applyOperation(op);

@@ -38,6 +38,11 @@ public:
      * 设置文档内容（初始化用）
      */
     void setContent(const std::string& content);
+
+    /**
+     * 设置文档版本号（恢复用）
+     */
+    void setVersion(uint64_t version);
     
     /**
      * 获取当前版本号
@@ -84,9 +89,9 @@ private:
     bool executeReplace(const Operation& op);
     
     /**
-     * 验证操作位置是否合法
+     * 验证操作位置是否合法（根据操作类型检查）
      */
-    bool validatePosition(size_t position) const;
+    bool validatePosition(const Operation& op) const;
     
     // ==================== 成员变量 ====================
     

@@ -97,7 +97,7 @@ TEST(RoomTest, ApplyAndBroadcast) {
     
     // 应用操作
     Operation op("op_001", "user_001", 1, OperationType::INSERT, 5, " Beautiful");
-    auto result = room.applyAndBroadcast(op, "user_001", nullptr);
+    auto result = room.applyAndBroadcast(op, "user_001");
     
     ASSERT_EQ(result, OperationResult::SUCCESS);
     ASSERT_EQ(room.getVersion(), 1);
@@ -120,7 +120,7 @@ TEST(RoomTest, BroadcastExcludesSender) {
     room.setBroadcastCallback(callback);
     
     Operation op("op_001", "user_001", 1, OperationType::INSERT, 5, " World");
-    room.applyAndBroadcast(op, "user_001", nullptr);
+    room.applyAndBroadcast(op, "user_001");
     
     // user_001收到1条消息（ACK），user_002和user_003各收到1条广播
     ASSERT_EQ(messageCount["user_001"], 1); // ACK
@@ -135,11 +135,11 @@ TEST(RoomTest, VersionConflictDetection) {
     
     // 第一次应用（版本1）
     Operation op1("op_001", "user_001", 1, OperationType::INSERT, 5, " World");
-    ASSERT_EQ(room.applyAndBroadcast(op1, "user_001", nullptr), OperationResult::SUCCESS);
+    ASSERT_EQ(room.applyAndBroadcast(op1, "user_001"), OperationResult::SUCCESS);
     
     // 再次用版本1会冲突
     Operation op2("op_002", "user_002", 1, OperationType::INSERT, 0, "Hi ");
-    ASSERT_EQ(room.applyAndBroadcast(op2, "user_002", nullptr), OperationResult::VERSION_CONFLICT);
+    ASSERT_EQ(room.applyAndBroadcast(op2, "user_002"), OperationResult::VERSION_CONFLICT);
 }
 
 // 测试21: 多用户协作场景
@@ -158,7 +158,7 @@ TEST(RoomTest, MultiUserCollaboration) {
     
     // 用户A插入操作
     Operation opA("op_A", "user_A", 1, OperationType::INSERT, 5, " World");
-    room.applyAndBroadcast(opA, "user_A", nullptr);
+    room.applyAndBroadcast(opA, "user_A");
     
     // user_A收到ACK，user_B收到广播
     ASSERT_EQ(messageCount["user_A"], 1); // ACK
@@ -166,7 +166,7 @@ TEST(RoomTest, MultiUserCollaboration) {
     
     // 用户B删除操作
     Operation opB("op_B", "user_B", 2, OperationType::DELETE, 0, "Hello");
-    room.applyAndBroadcast(opB, "user_B", nullptr);
+    room.applyAndBroadcast(opB, "user_B");
     
     // user_B收到ACK，user_A收到广播
     ASSERT_EQ(messageCount["user_A"], 2); // ACK + 广播
@@ -180,13 +180,13 @@ TEST(RoomTest, DocumentStateSync) {
     
     // 模拟多个操作
     Operation op1("op1", "user1", 1, OperationType::INSERT, 0, "Hello");
-    room.applyAndBroadcast(op1, "user1", nullptr);
+    room.applyAndBroadcast(op1, "user1");
     
     Operation op2("op2", "user2", 2, OperationType::INSERT, 5, " World");
-    room.applyAndBroadcast(op2, "user2", nullptr);
+    room.applyAndBroadcast(op2, "user2");
     
     Operation op3("op3", "user1", 3, OperationType::INSERT, 11, "!");
-    room.applyAndBroadcast(op3, "user1", nullptr);
+    room.applyAndBroadcast(op3, "user1");
     
     ASSERT_STREQ("Hello World!", room.getDocument().getContent().c_str());
     ASSERT_EQ(room.getVersion(), 3);

@@ -31,9 +31,13 @@ void Metrics::incrementActiveConnections() {
 }
 
 void Metrics::decrementActiveConnections() {
+    // 使用原子CAS确保不会下溢
     uint64_t current = activeConnections.load(std::memory_order_relaxed);
-    if (current > 0) {
-        activeConnections.fetch_sub(1, std::memory_order_relaxed);
+    while (current > 0) {
+        if (activeConnections.compare_exchange_weak(current, current - 1,
+                std::memory_order_relaxed, std::memory_order_relaxed)) {
+            break;
+        }
     }
 }
 

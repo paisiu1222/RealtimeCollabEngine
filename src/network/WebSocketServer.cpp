@@ -179,7 +179,10 @@ void WebSocketServer::setupRoutes() {
         nlohmann::json response;
         response["status"] = "ok";
         response["onlineUsers"] = getOnlineUserCount();
-        response["activeRooms"] = rooms.size();
+        {
+            std::lock_guard<std::mutex> lock(roomsMutex);
+            response["activeRooms"] = rooms.size();
+        }
         return crow::response(200, response.dump());
     });
     
@@ -349,7 +352,13 @@ void WebSocketServer::handleConnect(const std::string& connId, const nlohmann::j
     // 发送认证成功消息
     Message successMsg = MessageFactory::createConnectMessage(userId, "");
     successMsg.payload["status"] = "authenticated";
-    successMsg.payload["username"] = connections[connId].username;
+    {
+        std::lock_guard<std::mutex> lock(connectionsMutex);
+        auto it = connections.find(connId);
+        if (it != connections.end()) {
+            successMsg.payload["username"] = it->second.username;
+        }
+    }
     sendToConnection(connId, successMsg.toJson());
 }
 

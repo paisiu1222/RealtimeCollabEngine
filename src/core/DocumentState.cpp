@@ -24,7 +24,7 @@ OperationResult DocumentState::applyOperation(const Operation& op) {
     }
     
     // 验证操作位置
-    if (!validatePosition(op.position)) {
+    if (!validatePosition(op)) {
         logger.error("Invalid position in operation: " + std::to_string(op.position));
         return OperationResult::POSITION_OUT_OF_RANGE;
     }
@@ -78,8 +78,13 @@ std::string DocumentState::getContent() const {
 void DocumentState::setContent(const std::string& newContent) {
     std::lock_guard<std::mutex> lock(stateMutex);
     content = newContent;
-    logger.info("Document content set for doc " + docId + 
+    logger.info("Document content set for doc " + docId +
                ", length=" + std::to_string(content.length()));
+}
+
+void DocumentState::setVersion(uint64_t version) {
+    std::lock_guard<std::mutex> lock(stateMutex);
+    currentVersion = version;
 }
 
 uint64_t DocumentState::getVersion() const {
@@ -111,12 +116,29 @@ bool DocumentState::rollbackToVersion(uint64_t targetVersion) {
         logger.error("Target version not in history");
         return false;
     }
-    
-    // TODO: 实现真正的回滚逻辑
-    // 这需要从目标版本重新应用所有操作，或者保存快照
-    // 当前简化实现：只更新版本号
+
+    // 从空内容开始重放到目标版本
+    content.clear();
+    for (const auto& op : history) {
+        if (op.version > targetVersion) break;
+        switch (op.type) {
+            case OperationType::INSERT:
+                content.insert(op.position, op.content);
+                break;
+            case OperationType::DELETE:
+                if (op.position + op.content.length() <= content.length())
+                    content.erase(op.position, op.content.length());
+                break;
+            case OperationType::REPLACE:
+                if (op.position + op.content.length() <= content.length())
+                    content.replace(op.position, op.content.length(), op.content);
+                break;
+            default: break;
+        }
+    }
+
     currentVersion = targetVersion;
-    
+
     logger.info("Rolled back to version " + std::to_string(targetVersion));
     return true;
 }
@@ -166,17 +188,15 @@ bool DocumentState::executeReplace(const Operation& op) {
     }
 }
 
-bool DocumentState::validatePosition(size_t position) const {
-    // INSERT操作可以在末尾插入（position == content.length()）
+bool DocumentState::validatePosition(const Operation& op) const {
     if (currentVersion == 0 && content.empty()) {
-        return position == 0;
+        return op.position == 0;
     }
-    
-    if (content.empty()) {
-        return position == 0;
+
+    if (op.type == OperationType::INSERT) {
+        return op.position <= content.length();
     }
-    
-    return position <= content.length();
+    return op.position + op.content.length() <= content.length();
 }
 
 } // namespace core

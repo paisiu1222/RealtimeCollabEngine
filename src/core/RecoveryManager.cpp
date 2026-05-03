@@ -106,19 +106,18 @@ std::shared_ptr<DocumentState> RecoveryManager::recoverToVersion(const std::stri
 std::shared_ptr<DocumentState> RecoveryManager::rebuildFromSnapshot(const std::string& docId) {
     auto& snapshotManager = SnapshotManager::getInstance();
     auto snapshotData = snapshotManager.loadSnapshotData(docId);
-    
+
     auto state = std::make_shared<DocumentState>(snapshotData.docId);
     state->setContent(snapshotData.content);
-    
+    state->setVersion(snapshotData.version);
+
     if (snapshotData.version == 0) {
-        logger.info("No snapshot found for document: " + docId + 
+        logger.info("No snapshot found for document: " + docId +
                    ", starting from empty state");
     } else {
         logger.info("Rebuilt state from snapshot version: " + std::to_string(snapshotData.version));
-        // 注意：DocumentState的版本号通过applyOperation自动管理
-        // 这里无法直接设置版本号，需要通过后续操作来同步
     }
-    
+
     return state;
 }
 
@@ -155,12 +154,15 @@ std::vector<Operation> RecoveryManager::getOperationsAfterVersion(
                     op.userId = row[1];
                     op.version = std::stoull(row[2]);
                     
-                    // 解析操作类型
-                    if (row[3] == "INSERT") {
+                    // 解析操作类型（支持大小写以兼容不同数据来源）
+                    std::string opTypeStr = row[3];
+                    if (opTypeStr == "insert" || opTypeStr == "INSERT") {
                         op.type = OperationType::INSERT;
-                    } else if (row[3] == "DELETE") {
+                    } else if (opTypeStr == "delete" || opTypeStr == "DELETE") {
                         op.type = OperationType::DELETE;
-                    } else if (row[3] == "RETAIN") {
+                    } else if (opTypeStr == "replace" || opTypeStr == "REPLACE") {
+                        op.type = OperationType::REPLACE;
+                    } else if (opTypeStr == "retain" || opTypeStr == "RETAIN") {
                         op.type = OperationType::RETAIN;
                     }
                     

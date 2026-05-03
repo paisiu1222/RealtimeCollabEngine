@@ -7,8 +7,8 @@ namespace core {
 // ==================== 公共方法 ====================
 
 Operation OTAlgorithm::transform(const Operation& localOp, const Operation& remoteOp) {
-    // 如果操作来自同一用户或版本号不同，不需要转换
-    if (localOp.userId == remoteOp.userId || localOp.version != remoteOp.version) {
+    // 同一用户的操作不需要转换（串行执行）
+    if (localOp.userId == remoteOp.userId) {
         return localOp;
     }
     

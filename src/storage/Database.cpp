@@ -282,7 +282,7 @@ bool Database::queryMultipleRows(const std::string& sql,
     
     finalizeStatement(stmt);
     releaseConnection(conn);
-    return !results.empty();
+    return true;  // 即使结果集为空也返回true，调用者可通过results.empty()判断
 }
 
 // 开始事务
