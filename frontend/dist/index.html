@@ -4,10 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RealtimeCollabEngine — 实时协作文档</title>
-  <script type="module" crossorigin src="/assets/index-B0i2L3ge.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-B_FzS31-.css">
+  <script type="module" crossorigin src="/assets/index-A_qDPcWT.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-zTVVCa1S.css">
 </head>
 <body>
+  <!-- 登录浮层 -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="login-logo">&#9998;</div>
+      <h1>实时协作引擎</h1>
+      <p>输入用户名开始协作</p>
+      <div class="login-form">
+        <input type="text" id="loginUsername" placeholder="用户名 (如 alice)" autocomplete="off" />
+        <input type="password" id="loginPassword" placeholder="密码 (任意)" autocomplete="off" />
+        <div class="login-error" id="loginError" style="display:none"></div>
+        <button class="btn btn-primary" id="loginBtn" style="width:100%">进入</button>
+      </div>
+      <div class="login-hint">打开两个标签页，用不同用户名登录即可协作</div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- ====== 左侧：文档列表面板 ====== -->
@@ -54,8 +70,6 @@
             <span id="docMetaOwner"></span>
             <span class="meta-sep">·</span>
             <span id="docMetaTime"></span>
-            <span class="meta-sep">·</span>
-            <span id="docMetaVersion"></span>
           </div>
 
           <div class="editor-container" id="editorContainer">
@@ -68,52 +82,31 @@
       </div>
     </main>
 
-    <!-- ====== 右侧：协作者 + 版本历史面板 ====== -->
+    <!-- ====== 右侧：协作面板 ====== -->
     <aside class="collab-panel" id="collabPanel" style="display:none">
-      <div class="panel-tabs">
-        <button class="panel-tab active" data-tab="collab" onclick="window._switchTab('collab')">&#x1f465; 协作者</button>
-        <button class="panel-tab" data-tab="versions" onclick="window._switchTab('versions')">&#x1f4dc; 版本历史</button>
+      <div class="panel-section">
+        <h3>&#x1f465; 在线用户</h3>
+        <ul class="collab-list" id="collabList">
+          <li class="collab-item" id="localUserItem">
+            <div class="collab-avatar" id="localAvatar"></div>
+            <div class="collab-info">
+              <span class="collab-name" id="localName"></span>
+              <span class="collab-role">我</span>
+            </div>
+          </li>
+        </ul>
       </div>
-
-      <!-- Tab 1: 协作者 -->
-      <div class="panel-tab-content" id="tab-collab" style="display:flex;flex-direction:column;flex:1;overflow-y:auto;">
-        <div class="panel-section">
-          <ul class="collab-list" id="collabList">
-            <li class="collab-item" id="localUserItem">
-              <div class="collab-avatar" id="localAvatar"></div>
-              <div class="collab-info">
-                <span class="collab-name" id="localName"></span>
-                <span class="collab-role">我</span>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="panel-section">
-          <h3>&#x1f4ca; 文档信息</h3>
-          <div class="info-grid">
-            <div class="info-item"><span class="info-label">版本</span><span class="info-value" id="infoVersion">0</span></div>
-            <div class="info-item"><span class="info-label">操作数</span><span class="info-value" id="infoOps">0</span></div>
-            <div class="info-item"><span class="info-label">字数</span><span class="info-value" id="infoChars">0</span></div>
-            <div class="info-item"><span class="info-label">在线</span><span class="info-value" id="infoOnline">1</span></div>
-          </div>
-        </div>
-        <div class="panel-section flex-fill">
-          <h3>&#x1f4cb; 活动日志</h3>
-          <div class="log-container" id="logContainer">
-            <div class="log-entry">系统就绪</div>
-          </div>
+      <div class="panel-section">
+        <h3>&#x1f4ca; 文档信息</h3>
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">字数</span><span class="info-value" id="infoChars">0</span></div>
+          <div class="info-item"><span class="info-label">在线</span><span class="info-value" id="infoOnline">1</span></div>
         </div>
       </div>
-
-      <!-- Tab 2: 版本历史 -->
-      <div class="panel-tab-content" id="tab-versions" style="display:none;flex-direction:column;flex:1;overflow-y:auto;">
-        <div class="panel-section" style="border-bottom:1px solid var(--border)">
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="window._createSnapshot()">&#x1f4be; 保存当前版本</button>
-        </div>
-        <div class="panel-section flex-fill" style="padding-top:4px">
-          <div class="version-list" id="versionList">
-            <div class="version-empty">打开文档后查看版本历史</div>
-          </div>
+      <div class="panel-section flex-fill">
+        <h3>&#x1f4cb; 活动日志</h3>
+        <div class="log-container" id="logContainer">
+          <div class="log-entry">系统就绪</div>
         </div>
       </div>
     </aside>

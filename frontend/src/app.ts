@@ -1,22 +1,22 @@
 import { WsClient, type ConnectionState } from './ws-client';
 import { OTEngine } from './ot-engine';
 import { MockServer } from './mock-server';
-import { VersionManager } from './version-manager';
-import type { EditOp, CursorState, UserInfo, WireMessage, Version, DiffLine } from './protocol';
+
+import type { EditOp, CursorState, UserInfo, WireMessage } from './protocol';
 
 // ==================== 状态 ====================
 let ws: WsClient;
 let ot = new OTEngine();
 let mock: MockServer | null = null;
 let mockConn: { userId: string; username: string; roomId: string; send(raw: string): void } | null = null;
-let versionMgr = new VersionManager();
+
 const USE_MOCK = location.hash === '#mock' || !location.hostname.includes('collab');
 const WS_URL = USE_MOCK ? 'mock://local'
   : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
-const userId = 'user-' + Math.random().toString(36).slice(2, 10);
-const token = 'token-' + Math.random().toString(36).slice(2, 18);
-const username = '用户' + userId.slice(-4);
+let userId = '';
+let token = '';
+let username = '';
 
 interface DocMeta { id: string; title: string; ownerId: string; updatedAt: string; version: number; }
 const docList = new Map<string, DocMeta>();
@@ -25,13 +25,42 @@ const remoteUsers = new Map<string, { el: HTMLElement; color: string }>();
 const remoteCursors = new Map<string, HTMLElement>();
 let editorEl!: HTMLElement;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let applyingRemote = false;
 
 // ==================== 初始化 ====================
-export function init() {
+export function init(userName: string) {
+  username = userName || '用户-' + Math.random().toString(36).slice(2, 6);
+  userId = 'user-' + username.toLowerCase().replace(/[^a-z0-9]/g, '');
+  token = 'tok-' + Math.random().toString(36).slice(2, 14);
+
   ot.setUserId(userId);
 
   editorEl = document.getElementById('editor')!;
-  editorEl.addEventListener('input', onEditorInput);
+  // IME 组合输入期间不触发同步
+  let composing = false;
+  editorEl.addEventListener('compositionstart', () => { composing = true; });
+  editorEl.addEventListener('compositionend', () => { composing = false; onEditorInput(); });
+  editorEl.addEventListener('input', () => {
+    if (!composing && !applyingRemote) onEditorInput();
+  });
+  // Enter 键插入 \n（用 Selection API，兼容所有浏览器）
+  editorEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !composing) {
+      e.preventDefault();
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode('\n');
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        onEditorInput();
+      }
+    }
+  });
   editorEl.addEventListener('keyup', onCursorMove);
   editorEl.addEventListener('mouseup', onCursorMove);
   editorEl.addEventListener('click', onCursorMove);
@@ -63,6 +92,13 @@ function initMock() {
   setConnectionState('authenticated');
   addLog('模拟服务器已连接');
 
+  // 关闭/刷新页面前通知其他标签页
+  window.addEventListener('beforeunload', () => {
+    if (mock && mockConn && activeDocId) {
+      mock.handle(mockConn, JSON.stringify({ type: 'leave_room', messageId: 'bye', timestamp: new Date().toISOString(), payload: { roomId: activeDocId } }));
+    }
+  });
+
   // 预置两个示例文档
   seedMockDocs();
 }
@@ -78,7 +114,7 @@ function seedMockDocs() {
       updatedAt: new Date().toLocaleString('zh-CN'), version: 0,
     });
     mock!.createDoc(d.id, d.content);
-    versionMgr.openDocument(d.id, d.content);
+
   });
   renderDocList();
 }
@@ -180,11 +216,6 @@ function onEditorInput() {
         ws.sendOperation(op);
       }
     }
-    // Track for auto-snapshot
-    if (activeDocId) {
-      const triggered = versionMgr.recordOperation(activeDocId, text);
-      if (triggered) { addLog('自动创建版本快照'); renderVersionList(); }
-    }
     updateDocMeta();
   }
 }
@@ -192,6 +223,7 @@ function onEditorInput() {
 function applyRemoteOp(op: EditOp) {
   const transformed = ot.transformRemote(op);
   const text = editorEl.textContent ?? '';
+  applyingRemote = true;
   switch (transformed.type) {
     case 'insert':
       editorEl.textContent = text.slice(0, transformed.position) + transformed.content + text.slice(transformed.position);
@@ -207,6 +239,7 @@ function applyRemoteOp(op: EditOp) {
       break;
     }
   }
+  applyingRemote = false;
   updateDocMeta();
 }
 
@@ -251,13 +284,12 @@ function openDocument(id: string) {
       docList.get(activeDocId)!.title = oldTitle || '无标题文档';
     }
     const currentContent = editorEl.textContent ?? '';
-    if (mock) {
+    if (mock && mockConn) {
       mock.setDocContent(activeDocId, currentContent);
-      const leaveMsg = JSON.stringify({ type: 'leave_room', messageId: 'lr', timestamp: new Date().toISOString(), payload: { roomId: activeDocId } });
-      dispatchFromServer(leaveMsg);
+      mock.handle(mockConn, JSON.stringify({ type: 'leave_room', messageId: 'lr', timestamp: new Date().toISOString(), payload: { roomId: activeDocId } }));
     }
     // 自动快照
-    versionMgr.snapshot(activeDocId, currentContent, '切换文档前自动保存', true);
+
   }
 
   // 清理远程用户/光标
@@ -278,17 +310,16 @@ function openDocument(id: string) {
   editorEl.textContent = '';
 
   // 加入房间并初始化版本管理
-  if (mock) {
-    const joinMsg = JSON.stringify({ type: 'join_room', messageId: 'jr', timestamp: new Date().toISOString(), payload: { roomId: id } });
-    dispatchFromServer(joinMsg);
+  if (mock && mockConn) {
+    mock.handle(mockConn, JSON.stringify({ type: 'join_room', messageId: 'jr', timestamp: new Date().toISOString(), payload: { roomId: id } }));
     const syncContent = mock.getDocContent(id);
     ot.reset(syncContent, 0);
     editorEl.textContent = syncContent;
-    versionMgr.openDocument(id, syncContent);
+
   }
 
   renderDocList();
-  renderVersionList();
+
   updateDocMeta();
   addLog(`已打开: ${doc.title}`);
 }
@@ -398,114 +429,15 @@ function updateDocMeta() {
   const doc = docList.get(activeDocId);
   if (!doc) return;
   doc.updatedAt = new Date().toLocaleString('zh-CN');
-  doc.version = ot.getVersion();
   document.getElementById('docMetaOwner')!.textContent = username;
   document.getElementById('docMetaTime')!.textContent = doc.updatedAt;
-  document.getElementById('docMetaVersion')!.textContent = `版本 ${doc.version}`;
   updateInfoPanel();
   renderDocList();
 }
 function updateInfoPanel() {
-  document.getElementById('infoVersion')!.textContent = String(ot.getVersion());
   document.getElementById('infoChars')!.textContent = String((editorEl.textContent ?? '').length);
   document.getElementById('infoOnline')!.textContent = String(remoteUsers.size + 1);
-  document.getElementById('infoOps')!.textContent = String(ot.getVersion());
 }
-// ==================== 版本控制 ====================
-function createManualSnapshot() {
-  if (!activeDocId) return;
-  const message = prompt('请输入版本描述（如 Git commit message）：');
-  if (message === null) return;
-  const content = editorEl.textContent ?? '';
-  const v = versionMgr.snapshot(activeDocId, content, message || '手动保存', false);
-  addLog(`版本已保存: ${v.message}`);
-  renderVersionList();
-}
-
-function toggleVersion(versionId: string) {
-  const detail = document.getElementById(`ver-detail-${versionId}`);
-  if (!detail) return;
-  const visible = detail.style.display !== 'none';
-  detail.style.display = visible ? 'none' : 'block';
-  if (!visible) {
-    const currentContent = editorEl.textContent ?? '';
-    const diffLines = versionMgr.diffWithContent(versionId, currentContent);
-    const diffEl = document.getElementById(`ver-diff-${versionId}`);
-    const v = versionMgr.getVersion(versionId);
-    if (diffEl && diffLines && v) {
-      diffEl.innerHTML = renderDiffHtml(diffLines);
-    }
-  }
-}
-
-function restoreVersion(versionId: string) {
-  const v = versionMgr.getVersion(versionId);
-  if (!v) return;
-  if (!confirm(`确定要恢复到版本「${v.message}」（${new Date(v.timestamp).toLocaleString('zh-CN')}）？\n当前内容将被替换。`)) return;
-
-  editorEl.textContent = v.content;
-  ot.reset(v.content, v.version);
-  if (mock && activeDocId) mock.setDocContent(activeDocId, v.content);
-  // 创建恢复点
-  versionMgr.snapshot(activeDocId, v.content, `恢复到: ${v.message}`, false);
-  updateDocMeta();
-  renderVersionList();
-  addLog(`已恢复到版本: ${v.message}`);
-}
-
-function renderVersionList() {
-  const container = document.getElementById('versionList');
-  if (!container) return;
-  if (!activeDocId) {
-    container.innerHTML = '<div class="version-empty">打开文档后查看版本历史</div>';
-    return;
-  }
-  const versions = versionMgr.getVersions(activeDocId);
-  if (versions.length === 0) {
-    container.innerHTML = '<div class="version-empty">暂无版本快照</div>';
-    return;
-  }
-  container.innerHTML = versions.map(v => `
-    <div class="version-item">
-      <div class="version-item-header" onclick="window._toggleVersion('${v.id}')">
-        <span class="version-badge ${v.isAuto ? 'auto' : 'manual'}">${v.isAuto ? '自动' : '手动'}</span>
-        <span class="version-num">v${v.version}</span>
-        <span class="version-time">${new Date(v.timestamp).toLocaleString('zh-CN')}</span>
-      </div>
-      <div class="version-message">${escapeHtml(v.message)}</div>
-      <div class="version-detail" id="ver-detail-${v.id}" style="display:none">
-        <div class="version-diff-preview" id="ver-diff-${v.id}">
-          <span class="version-loading">点击展开查看差异...</span>
-        </div>
-        <div class="version-actions">
-          <button class="btn btn-sm" onclick="event.stopPropagation();window._restoreVersion('${v.id}')">恢复此版本</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderDiffHtml(lines: DiffLine[]): string {
-  const additions = lines.filter(l => l.type === 'added').length;
-  const deletions = lines.filter(l => l.type === 'deleted').length;
-  const summary = `<div class="diff-summary"><span class="diff-added-count">+${additions}</span> <span class="diff-deleted-count">-${deletions}</span> 行变更 (对比当前版本)</div>`;
-  const content = lines.map(l => {
-    const cls = l.type === 'added' ? 'diff-added' : l.type === 'deleted' ? 'diff-deleted' : 'diff-unchanged';
-    const sign = l.type === 'added' ? '+' : l.type === 'deleted' ? '-' : ' ';
-    const lineNum = l.type === 'added' ? (l.lineNumber.new ?? '') : (l.lineNumber.old ?? '');
-    return `<div class="diff-line ${cls}"><span class="diff-sign">${sign}</span><span class="diff-linenum">${lineNum}</span><span class="diff-text">${escapeHtml(l.text || ' ')}</span></div>`;
-  }).join('');
-  return summary + content;
-}
-
-function switchTab(tabName: string) {
-  document.querySelectorAll('.panel-tab').forEach(t => {
-    t.classList.toggle('active', (t as HTMLElement).dataset.tab === tabName);
-  });
-  (document.getElementById('tab-collab') as HTMLElement).style.display = tabName === 'collab' ? '' : 'none';
-  (document.getElementById('tab-versions') as HTMLElement).style.display = tabName === 'versions' ? '' : 'none';
-}
-
 function addLog(msg: string) {
   const c = document.getElementById('logContainer')!;
   const d = document.createElement('div');
@@ -542,7 +474,3 @@ function escapeHtml(s: string): string {
 // 暴露给 HTML onclick
 (window as any)._openDoc = openDocument;
 (window as any)._delDoc = deleteDocument;
-(window as any)._toggleVersion = toggleVersion;
-(window as any)._restoreVersion = restoreVersion;
-(window as any)._createSnapshot = createManualSnapshot;
-(window as any)._switchTab = switchTab;
